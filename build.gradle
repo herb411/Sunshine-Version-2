@@ -1,4 +1,62 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+name: Check README edit - invalid PR check
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    paths:
+      - "README.md"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: invalid-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Reject manual README edits
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Comment, label, and close PR
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const issueNumber = context.issue.number;
+
+            const labels = context.payload.pull_request.labels || [];
+            const alreadyInvalid = labels.some(
+              label => label.name === "invalid: README.md edited"
+            );
+
+            if (!alreadyInvalid) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body:
+                  "This PR is not valid because README.md should not be " +
+                  "manually edited. Please update data.json instead."
+              });
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                labels: ["invalid: README.md edited"]
+              });
+            }
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: issueNumber,
+              state: "closed"
+            });// Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
     repositories {
